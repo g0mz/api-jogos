@@ -207,7 +207,7 @@
         <p id="resumo"></p>
 
         <h2>Cadastrar jogo</h2>
-        <form id="formulario">
+        <form id="formulario" novalidate>
             <div>
                 <label for="titulo">Título</label>
                 <input type="text" id="titulo" autocomplete="off">
@@ -267,16 +267,39 @@
             lista.appendChild(aviso);
         }
 
+        function mostrarFalha(texto) {
+            progresso.innerHTML = "";
+            resumo.textContent = "";
+            mostrarAviso(texto, "falha");
+        }
+
+        // Cada carga da lista recebe um número. Se uma carga mais nova começou
+        // enquanto esta esperava a resposta, esta é descartada, para a lista
+        // nunca voltar para um estado antigo.
+        let ultimaCarga = 0;
+
         // focarId: id do jogo cujo botão "zerado" recebe o foco depois de redesenhar a lista
         async function carregarJogos(focarId) {
+            const estaCarga = ++ultimaCarga;
+            let resposta;
             let dados;
             try {
-                const resposta = await fetch(API);
-                dados = await resposta.json();
+                resposta = await fetch(API);
+                if (resposta.ok) {
+                    dados = await resposta.json();
+                }
             } catch (erro) {
-                progresso.innerHTML = "";
-                resumo.textContent = "";
-                mostrarAviso("Não foi possível carregar os jogos. Confira se o servidor está rodando e recarregue a página.", "falha");
+                if (estaCarga === ultimaCarga) {
+                    mostrarFalha("Não foi possível falar com o servidor. Confira se ele está rodando e recarregue a página.");
+                }
+                return;
+            }
+
+            if (estaCarga !== ultimaCarga) {
+                return;
+            }
+            if (!resposta.ok) {
+                mostrarFalha("O servidor teve um erro ao carregar os jogos (status " + resposta.status + "). Recarregue a página.");
                 return;
             }
 
@@ -353,14 +376,21 @@
                     formulario.reset();
                     document.getElementById("titulo").focus();
                     carregarJogos();
-                } else {
+                } else if (resposta.headers.get("Content-Type") === "application/json") {
                     const dados = await resposta.json();
                     mensagem.textContent = dados.erro;
+                } else {
+                    mensagem.textContent = "O servidor teve um erro ao cadastrar o jogo (status "
+                        + resposta.status + "). Tente de novo.";
                 }
             } catch (erro) {
-                mensagem.textContent = "Não foi possível falar com o servidor. Tente de novo.";
+                mensagem.textContent = "Não foi possível falar com o servidor. Confira se ele está rodando e tente de novo.";
             } finally {
                 botao.disabled = false;
+                // Desativar o botão tira o foco dele; se o foco se perdeu, ele volta para o botão.
+                if (document.activeElement === document.body) {
+                    botao.focus();
+                }
             }
         });
 
