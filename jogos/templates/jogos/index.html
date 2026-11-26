@@ -9,16 +9,24 @@
     <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         :root {
+            color-scheme: dark;
             --fundo: #1C1530;
             --superficie: #271E40;
             --linha: #4A3D70;
+            --borda: #7A6CA3;
             --texto: #F1ECFA;
             --texto-suave: #A79BC4;
             --destaque: #FFB547;
+            --destaque-claro: #FFC56E;
             --perigo: #FF7A7A;
         }
 
         * { box-sizing: border-box; }
+
+        ::selection {
+            background: var(--destaque);
+            color: var(--fundo);
+        }
 
         body {
             margin: 0;
@@ -86,7 +94,8 @@
             font: inherit;
             color: var(--texto);
             background: var(--fundo);
-            border: 1px solid var(--linha);
+            border: 1px solid var(--borda);
+            caret-color: var(--destaque);
         }
 
         button {
@@ -95,7 +104,7 @@
             font: inherit;
             font-weight: 500;
             cursor: pointer;
-            border: 1px solid var(--linha);
+            border: 1px solid var(--borda);
             background: transparent;
             color: var(--texto);
             transition: background-color 150ms ease, border-color 150ms ease;
@@ -108,13 +117,22 @@
             color: var(--fundo);
             font-weight: 700;
         }
-        .principal:hover { background: #FFC56E; border-color: #FFC56E; }
+        .principal:hover {
+            background: var(--destaque-claro);
+            border-color: var(--destaque-claro);
+        }
 
         .excluir { color: var(--perigo); }
         .excluir:hover { border-color: var(--perigo); }
 
+        button:disabled {
+            opacity: 0.55;
+            cursor: progress;
+        }
+
         input:focus-visible,
-        button:focus-visible {
+        button:focus-visible,
+        h2:focus-visible {
             outline: 3px solid var(--destaque);
             outline-offset: 2px;
         }
@@ -143,7 +161,7 @@
             flex: none;
             width: 14px;
             height: 14px;
-            border: 2px solid var(--linha);
+            border: 2px solid var(--borda);
         }
         .jogo.zerado .marca {
             background: var(--destaque);
@@ -159,6 +177,7 @@
         .detalhes {
             color: var(--texto-suave);
             font-size: 0.9375rem;
+            font-variant-numeric: tabular-nums;
         }
         .acoes {
             display: flex;
@@ -166,6 +185,7 @@
             flex: none;
         }
         .vazio { color: var(--texto-suave); }
+        .falha { color: var(--perigo); }
 
         @media (max-width: 600px) {
             h1 { font-size: 2rem; }
@@ -204,8 +224,10 @@
         </form>
         <p id="mensagem" role="alert"></p>
 
-        <h2>Jogos</h2>
-        <ul id="lista"></ul>
+        <h2 id="titulo-lista" tabindex="-1">Jogos</h2>
+        <ul id="lista">
+            <li class="vazio">Carregando jogos...</li>
+        </ul>
     </main>
 
     <script>
@@ -237,18 +259,32 @@
             }
         }
 
-        async function carregarJogos() {
-            const resposta = await fetch(API);
-            const dados = await resposta.json();
+        function mostrarAviso(texto, classe) {
+            lista.innerHTML = "";
+            const aviso = document.createElement("li");
+            aviso.className = classe;
+            aviso.textContent = texto;
+            lista.appendChild(aviso);
+        }
+
+        // focarId: id do jogo cujo botão "zerado" recebe o foco depois de redesenhar a lista
+        async function carregarJogos(focarId) {
+            let dados;
+            try {
+                const resposta = await fetch(API);
+                dados = await resposta.json();
+            } catch (erro) {
+                progresso.innerHTML = "";
+                resumo.textContent = "";
+                mostrarAviso("Não foi possível carregar os jogos. Confira se o servidor está rodando e recarregue a página.", "falha");
+                return;
+            }
 
             mostrarProgresso(dados.jogos);
             lista.innerHTML = "";
 
             if (dados.jogos.length === 0) {
-                const vazio = document.createElement("li");
-                vazio.className = "vazio";
-                vazio.textContent = "Nenhum jogo cadastrado. Use o formulário acima para adicionar o primeiro.";
-                lista.appendChild(vazio);
+                mostrarAviso("Nenhum jogo cadastrado. Use o formulário acima para adicionar o primeiro.", "vazio");
                 return;
             }
 
@@ -277,16 +313,20 @@
                 const botaoZerado = document.createElement("button");
                 botaoZerado.textContent =
                     jogo.zerado ? "Desmarcar zerado" : "Marcar como zerado";
-                botaoZerado.onclick = () => alterarZerado(jogo);
+                botaoZerado.onclick = () => alterarZerado(jogo, botaoZerado);
 
                 const botaoExcluir = document.createElement("button");
                 botaoExcluir.className = "excluir";
                 botaoExcluir.textContent = "Excluir";
-                botaoExcluir.onclick = () => excluirJogo(jogo);
+                botaoExcluir.onclick = () => excluirJogo(jogo, botaoExcluir);
 
                 acoes.append(botaoZerado, botaoExcluir);
                 item.append(marca, info, acoes);
                 lista.appendChild(item);
+
+                if (jogo.id === focarId) {
+                    botaoZerado.focus();
+                }
             }
         }
 
@@ -299,37 +339,57 @@
                 ano: Number(document.getElementById("ano").value),
             };
 
-            const resposta = await fetch(API, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(novoJogo),
-            });
+            const botao = formulario.querySelector("button");
+            botao.disabled = true;
+            try {
+                const resposta = await fetch(API, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(novoJogo),
+                });
 
-            if (resposta.status === 201) {
-                mensagem.textContent = "";
-                formulario.reset();
-                carregarJogos();
-            } else {
-                const dados = await resposta.json();
-                mensagem.textContent = dados.erro;
+                if (resposta.status === 201) {
+                    mensagem.textContent = "";
+                    formulario.reset();
+                    document.getElementById("titulo").focus();
+                    carregarJogos();
+                } else {
+                    const dados = await resposta.json();
+                    mensagem.textContent = dados.erro;
+                }
+            } catch (erro) {
+                mensagem.textContent = "Não foi possível falar com o servidor. Tente de novo.";
+            } finally {
+                botao.disabled = false;
             }
         });
 
-        async function alterarZerado(jogo) {
-            await fetch(API + jogo.id + "/", {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ zerado: !jogo.zerado }),
-            });
-            carregarJogos();
+        async function alterarZerado(jogo, botao) {
+            botao.disabled = true;
+            try {
+                await fetch(API + jogo.id + "/", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ zerado: !jogo.zerado }),
+                });
+            } catch (erro) {
+                // a lista abaixo mostra o aviso de falha
+            }
+            carregarJogos(jogo.id);
         }
 
-        async function excluirJogo(jogo) {
+        async function excluirJogo(jogo, botao) {
             if (!confirm("Excluir \"" + jogo.titulo + "\"?")) {
                 return;
             }
-            await fetch(API + jogo.id + "/", { method: "DELETE" });
-            carregarJogos();
+            botao.disabled = true;
+            try {
+                await fetch(API + jogo.id + "/", { method: "DELETE" });
+            } catch (erro) {
+                // a lista abaixo mostra o aviso de falha
+            }
+            await carregarJogos();
+            document.getElementById("titulo-lista").focus();
         }
 
         carregarJogos();
