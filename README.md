@@ -7,6 +7,8 @@ marca/desmarca como zerado e exclui, sem recarregar a página.
 Cada jogo tem: `titulo` (texto), `plataforma` (texto), `ano` (número) e `zerado` (verdadeiro/falso).
 
 ## Como rodar
+Requer Python 3.12 ou superior.
+
 1. python -m venv venv
 2. venv\Scripts\activate
 3. pip install -r requirements.txt
@@ -29,13 +31,13 @@ repositório.
 
 ## Rotas da API
 
-| Método | URL              | Descrição        | Respostas     |
-|--------|------------------|------------------|---------------|
-| GET    | /api/jogos/      | Lista os jogos   | 200           |
-| POST   | /api/jogos/      | Cadastra um jogo | 201, 400      |
-| GET    | /api/jogos/<id>/ | Busca um jogo    | 200, 404      |
-| PUT    | /api/jogos/<id>/ | Altera um jogo   | 200, 400, 404 |
-| DELETE | /api/jogos/<id>/ | Exclui um jogo   | 204, 404      |
+| Método | URL                | Descrição        | Respostas     |
+|--------|--------------------|------------------|---------------|
+| GET    | `/api/jogos/`      | Lista os jogos   | 200           |
+| POST   | `/api/jogos/`      | Cadastra um jogo | 201, 400      |
+| GET    | `/api/jogos/<id>/` | Busca um jogo    | 200, 404      |
+| PUT    | `/api/jogos/<id>/` | Altera um jogo   | 200, 400, 404 |
+| DELETE | `/api/jogos/<id>/` | Exclui um jogo   | 204, 404      |
 
 No POST, os campos `titulo`, `plataforma` e `ano` são obrigatórios. Exemplo de corpo:
 
