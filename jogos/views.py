@@ -52,7 +52,7 @@ def jogos(request):
     if request.method == "POST":
         try:
             dados = json.loads(request.body)
-        except json.JSONDecodeError:
+        except ValueError:  # JSON mal formado ou corpo que não está em UTF-8
             return JsonResponse({"erro": "JSON inválido."}, status=400)
 
         erro = erro_nos_dados(dados, cadastro=True)
@@ -82,7 +82,7 @@ def jogo_detalhe(request, id):
     if request.method == "PUT":
         try:
             dados = json.loads(request.body)
-        except json.JSONDecodeError:
+        except ValueError:  # JSON mal formado ou corpo que não está em UTF-8
             return JsonResponse({"erro": "JSON inválido."}, status=400)
 
         erro = erro_nos_dados(dados, cadastro=False)
